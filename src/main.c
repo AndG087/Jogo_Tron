@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include "screen.h"
 #include "keyboard.h"
@@ -106,25 +107,55 @@ void printrastro2(int nextX, int nextY) {
     printf(".");
 }
 
-void displayInitialScreen(char *player1, char *player2) {
-    screenInit(1);
-    keyboardInit();
-    printf("Digite o nome do Jogador 1: ");
-    scanf("%s", player1);
-    printf("Digite o nome do Jogador 2: ");
-    scanf("%s", player2);
-    screenDestroy();
-    keyboardDestroy();
+void drawBorders() {
+    for (int i = MINX; i <= MAXX; i++) {
+        screenGotoxy(i, MINY);
+        printf("#");
+        screenGotoxy(i, MAXY);
+        printf("#");
+    }
+    for (int i = MINY; i <= MAXY; i++) {
+        screenGotoxy(MINX, i);
+        printf("#");
+        screenGotoxy(MAXX, i);
+        printf("#");
+    }
+    screenUpdate();
 }
 
-void saveWinner(const char *winner) {
+void displayInitialScreen() {
+    char player1[50], player2[50];
+    screenInit(1);
+    keyboardInit();
+
+    // Exibir o anagrama do nome do jogo
+    printf("██████╗ ███████╗ █████╗ ████████╗██╗  ██╗    ██████╗  █████╗  ██████╗███████╗\n");
+    printf("██╔══██╗██╔════╝██╔══██╗╚══██╔══╝██║  ██║    ██╔══██╗██╔══██╗██╔════╝██╔════╝\n");
+    printf("██║  ██║█████╗  ███████║   ██║   ███████║    ██████╔╝███████║██║     █████╗  \n");
+    printf("██║  ██║██╔══╝  ██╔══██║   ██║   ██╔══██║    ██╔══██╗██╔══██║██║     ██╔══╝  \n");
+    printf("██████╔╝███████╗██║  ██║   ██║   ██║  ██║    ██║  ██║██║  ██║╚██████╗███████╗\n");
+    printf("╚═════╝ ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝\n");
+
+    // Coletar os nomes dos jogadores
+    printf("\nDigite o nome do Jogador 1: ");
+    scanf("%s", player1);
+    printf("\nDigite o nome do Jogador 2: ");
+    scanf("%s", player2);
+
+    // Salvar os nomes no arquivo winner.txt
     FILE *file = fopen("winner.txt", "w");
     if (file != NULL) {
-        fprintf(file, "Vencedor: %s\n", winner);
+        fprintf(file, "%s\n", player1);
+        fprintf(file, "%s\n", player2);
         fclose(file);
     } else {
-        printf("Erro ao abrir o arquivo para salvar o vencedor.\n");
+        printf("Erro ao abrir o arquivo para salvar os nomes dos jogadores.\n");
     }
+
+    drawBorders();
+
+    screenDestroy();
+    keyboardDestroy();
 }
 
 void initializeGame() {
@@ -247,12 +278,33 @@ int playGame() {
     return gameOver;
 }
 
+void saveWinner(const char *winner) {
+    FILE *file = fopen("winner.txt", "a");
+    if (file != NULL) {
+        fprintf(file, "Vencedor: %s\n", winner);
+        fclose(file);
+    } else {
+        printf("Erro ao abrir o arquivo para salvar o vencedor.\n");
+    }
+}
+
 int main() {
     char player1[50], player2[50];
     int winsPlayer1 = 0, winsPlayer2 = 0;
     int winner;
 
-    displayInitialScreen(player1, player2);
+    displayInitialScreen();
+
+    // Ler os nomes dos jogadores do arquivo winner.txt
+    FILE *file = fopen("winner.txt", "r");
+    if (file != NULL) {
+        fscanf(file, "%s", player1);
+        fscanf(file, "%s", player2);
+        fclose(file);
+    } else {
+        printf("Erro ao abrir o arquivo para ler os nomes dos jogadores.\n");
+        return 1;
+    }
 
     while (winsPlayer1 < 2 && winsPlayer2 < 2) {
         initializeGame();
