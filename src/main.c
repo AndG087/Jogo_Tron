@@ -4,11 +4,11 @@
 #include "timer.h"
 
 // Variáveis globais
-int x = 34, y = 12;
-int x2 = 54, y2 = 10;
+int x, y;
+int x2, y2;
 int ver = 0, hor = 0;
 int ver2 = 0, hor2 = 0;
-int incX = 1, incY = 1;
+int incX = 1, incY = 1;             
 int incX2 = 1, incY2 = 1;
 
 #define MAX_TRAIL 1000
@@ -21,8 +21,8 @@ typedef struct {
 
 Position trail[MAX_TRAIL];
 Position trail2[MAX_TRAIL];
-int trailLength = 0;
-int trail2Length = 0;
+int trailLength;
+int trail2Length;
 
 void addTrail(int x, int y) {
     if (trailLength < MAX_TRAIL) {
@@ -46,12 +46,22 @@ int checkCollision(int nextX, int nextY) {
             return 1;
         }
     }
+    for (int i = 0; i < trail2Length; i++) {
+        if (trail2[i].x == nextX && trail2[i].y == nextY) {
+            return 1;
+        }
+    }
     return 0;
 }
 
 int checkCollision2(int nextX, int nextY) {
     for (int i = 0; i < trail2Length; i++) {
         if (trail2[i].x == nextX && trail2[i].y == nextY) {
+            return 1;
+        }
+    }
+    for (int i = 0; i < trailLength; i++) {
+        if (trail[i].x == nextX && trail[i].y == nextY) {
             return 1;
         }
     }
@@ -96,24 +106,49 @@ void printrastro2(int nextX, int nextY) {
     printf(".");
 }
 
-int main() {
-    static int ch = 0;
-    int gameOver = 0;
+void displayInitialScreen(char *player1, char *player2) {
+    screenInit(1);
+    keyboardInit();
+    printf("Digite o nome do Jogador 1: ");
+    scanf("%s", player1);
+    printf("Digite o nome do Jogador 2: ");
+    scanf("%s", player2);
+    screenDestroy();
+    keyboardDestroy();
+}
 
+void saveWinner(const char *winner) {
+    FILE *file = fopen("winner.txt", "w");
+    if (file != NULL) {
+        fprintf(file, "Vencedor: %s\n", winner);
+        fclose(file);
+    } else {
+        printf("Erro ao abrir o arquivo para salvar o vencedor.\n");
+    }
+}
+
+void initializeGame() {
+    x = 34; y = 12;
+    x2 = 54; y2 = 10;
+    ver = hor = ver2 = hor2 = 0;
+    trailLength = trail2Length = 0;
     screenInit(1);
     keyboardInit();
     timerInit(50);
-
     PrintPlayer1ver(x, y);
-    PrintPlayer2ver(x2, y2); // Imprime o segundo jogador
+    PrintPlayer2ver(x2, y2);
     screenUpdate();
+}
+
+int playGame() {
+    static int ch = 0;
+    int gameOver = 0;
+    char last_move1 = 'a';
+    char last_move2 = 'j';
 
     while (ch != 10 && !gameOver) { // enter or collision
         // Handle user input
-        hor = 0;
-        ver = 0;
-        hor2 = 0;
-        ver2 = 0;
+        hor = ver = hor2 = ver2 = 0;
 
         if (keyhit()) {
             ch = readch();
@@ -127,53 +162,57 @@ int main() {
         int newY2 = y2;
 
         if (timerTimeOver() == 1) {
+            // Atualizar o último movimento dos jogadores
+            if (ch == 'w' || ch == 's' || ch == 'a' || ch == 'd') {
+                last_move1 = ch;
+            }
+            if (ch == 'i' || ch == 'k' || ch == 'j' || ch == 'l') {
+                last_move2 = ch;
+            }
+
             // Movimentação do primeiro jogador
-            if (ch == 'w') { // w - move up
+            if (last_move1 == 'w') { // w - move up
                 newY -= incY;
                 if (newY <= MINY + 1) newY = MINY + 1;
                 ver = 1;
-            } else if (ch == 's') { // s - move down
+            } else if (last_move1 == 's') { // s - move down
                 newY += incY;
                 if (newY >= MAXY - 1) newY = MAXY - 1;
                 ver = 1;
-            } else if (ch == 'a') { // a - move left
+            } else if (last_move1 == 'a') { // a - move left
                 newX -= incX;
                 if (newX <= MINX + 1) newX = MINX + 1;
                 hor = 1;
-            } else if (ch == 'd') { // d - move right
+            } else if (last_move1 == 'd') { // d - move right
                 newX += incX;
                 if (newX >= MAXX - strlen("|") - 1) newX = MAXX - strlen("|") - 1;
                 hor = 1;
             }
 
             // Movimentação do segundo jogador
-            if (ch == 'i') { // i - move up
+            if (last_move2 == 'i') { // i - move up
                 newY2 -= incY2;
                 if (newY2 <= MINY + 1) newY2 = MINY + 1;
                 ver2 = 1;
-            } else if (ch == 'k') { // k - move down
+            } else if (last_move2 == 'k') { // k - move down
                 newY2 += incY2;
                 if (newY2 >= MAXY - 1) newY2 = MAXY - 1;
                 ver2 = 1;
-            } else if (ch == 'j') { // j - move left
+            } else if (last_move2 == 'j') { // j - move left
                 newX2 -= incX2;
                 if (newX2 <= MINX + 1) newX2 = MINX + 1;
                 hor2 = 1;
-            } else if (ch == 'l') { // l - move right
+            } else if (last_move2 == 'l') { // l - move right
                 newX2 += incX2;
                 if (newX2 >= MAXX - strlen("|") - 1) newX2 = MAXX - strlen("|") - 1;
                 hor2 = 1;
             }
 
-            // Verificar colisão com o rastro do primeiro jogador
-            if (checkCollision(newX, newY)) {
+            // Verificar colisão com os rastros de ambos os jogadores
+            if (checkCollision(newX, newY) || (newX == x2 && newY == y2)) {
                 gameOver = 1;
-                // Implemente o que acontece quando o primeiro jogador perde
-            }
-            // Verificar colisão com o rastro do segundo jogador
-            else if (checkCollision2(newX2, newY2)) {
-                gameOver = 2; // Indica que o segundo jogador perdeu
-                // Implemente o que acontece quando o segundo jogador perde
+            } else if (checkCollision2(newX2, newY2) || (newX2 == x && newY2 == y)) {
+                gameOver = 2;
             } else {
                 // Atualizar o rastro e a posição de ambos os jogadores
                 addTrail(x, y);
@@ -204,11 +243,37 @@ int main() {
     keyboardDestroy();
     screenDestroy();
     timerDestroy();
-    if (gameOver = 1){
-        printf("  ######     ###    ##     ## ########      ######### ##    ## ######## ########\n ##    ##   ## ##   ###   ### ##            ##     ## ##    ## ##       ##     ##\n ##        ##   ##  #### #### ##            ##     ## ##    ## ##       ##     ##\n ##  ###  ##     ## ## ### ## ######        ##     ## ##    ## ######   ########\n ##  # ## ######### ##     ## ##            ##     ## ##    ## ##       ##   ##\n ##  # ## ##     ## ##     ## ##            ##     ##  #    #  ##       ##    ##\n  ######  ##     ## ##     ## ########      #########   ####   ######## ##     ##\n");
+
+    return gameOver;
+}
+
+int main() {
+    char player1[50], player2[50];
+    int winsPlayer1 = 0, winsPlayer2 = 0;
+    int winner;
+
+    displayInitialScreen(player1, player2);
+
+    while (winsPlayer1 < 2 && winsPlayer2 < 2) {
+        initializeGame();
+        winner = playGame();
+
+        if (winner == 1) {
+            winsPlayer2++;
+        } else if (winner == 2) {
+            winsPlayer1++;
+        }
+
+        printf("Placar: %s %d x %d %s\n", player1, winsPlayer1, winsPlayer2, player2);
     }
-    if (gameOver = 2){
-        printf("  ######     ###    ##     ## ########      ######### ##    ## ######## ########\n ##    ##   ## ##   ###   ### ##            ##     ## ##    ## ##       ##     ##\n ##        ##   ##  #### #### ##            ##     ## ##    ## ##       ##     ##\n ##  ###  ##     ## ## ### ## ######        ##     ## ##    ## ######   ########\n ##  # ## ######### ##     ## ##            ##     ## ##    ## ##       ##   ##\n ##  # ## ##     ## ##     ## ##            ##     ##  #    #  ##       ##    ##\n  ######  ##     ## ##     ## ########      #########   ####   ######## ##     ##\n");
+
+    if (winsPlayer1 == 2) {
+        printf("Parabéns %s, você venceu a melhor de 3!\n", player1);
+        saveWinner(player1);
+    } else {
+        printf("Parabéns %s, você venceu a melhor de 3!\n", player2);
+        saveWinner(player2);
     }
+
     return 0;
 }
