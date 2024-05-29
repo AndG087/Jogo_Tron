@@ -22,11 +22,11 @@ O arquivo `main.c` contém um exemplo de como usar as funções de Teclado, Tela
 Para compilar este exemplo via linha de comando, basta navegar até o diretório raiz da biblioteca e digitar o seguinte comando:
 
 ```bash
-gcc ./src/*.c -I./include -o run
+gcc ./src/*.c -I./include -o tron.out
 
 ```
 Para executar:
 
 ```bash
-./run
+./tron.out
 ```
