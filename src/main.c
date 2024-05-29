@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include <string.h>
 #include "screen.h"
 #include "keyboard.h"
@@ -9,21 +11,87 @@ int x, y;
 int x2, y2;
 int ver = 0, hor = 0;
 int ver2 = 0, hor2 = 0;
-int incX = 1, incY = 1;             
+int incX = 1, incY = 1;
 int incX2 = 1, incY2 = 1;
 
 #define MAX_TRAIL 1000
+#define MAX_OBSTACLES 20
+#define POWER_UP_DURATION 100
 
-// Estrutura para armazenar a posição do rastro
+// Estrutura para armazenar a posição do rastro e dos obstáculos
 typedef struct {
     int x;
     int y;
 } Position;
 
+// Estrutura para lista encadeada dos vencedores
+typedef struct Node {
+    char name[50];
+    int wins;
+    struct Node *next;
+} Node;
+
+// Variáveis da lista encadeada
+Node *head = NULL;
+
 Position trail[MAX_TRAIL];
 Position trail2[MAX_TRAIL];
+Position obstacles[MAX_OBSTACLES];
 int trailLength;
 int trail2Length;
+int powerUpActive1 = 0;
+int powerUpActive2 = 0;
+int powerUpCounter1 = 0;
+int powerUpCounter2 = 0;
+
+// Funções para manipulação da lista encadeada
+Node* createNode(const char *name, int wins) {
+    Node *newNode = (Node *)malloc(sizeof(Node));
+    if (newNode == NULL) {
+        fprintf(stderr, "Erro ao alocar memória\n");
+        exit(1);
+    }
+    strcpy(newNode->name, name);
+    newNode->wins = wins;
+    newNode->next = NULL;
+    return newNode;
+}
+
+void appendNode(Node **head, const char *name, int wins) {
+    Node *newNode = createNode(name, wins);
+    if (*head == NULL) {
+        *head = newNode;
+        return;
+    }
+    Node *temp = *head;
+    while (temp->next != NULL) {
+        temp = temp->next;
+    }
+    temp->next = newNode;
+}
+
+void saveListToFile(Node *head, const char *filename) {
+    FILE *file = fopen(filename, "a"); // Abre o arquivo em modo de append
+    if (file == NULL) {
+        fprintf(stderr, "Erro ao abrir o arquivo para salvar a lista\n");
+        exit(1);
+    }
+    Node *temp = head;
+    while (temp != NULL) {
+        fprintf(file, "%s %d\n", temp->name, temp->wins);
+        temp = temp->next;
+    }
+    fclose(file);
+}
+
+void freeList(Node *head) {
+    Node *temp;
+    while (head != NULL) {
+        temp = head;
+        head = head->next;
+        free(temp);
+    }
+}
 
 void addTrail(int x, int y) {
     if (trailLength < MAX_TRAIL) {
@@ -52,6 +120,11 @@ int checkCollision(int nextX, int nextY) {
             return 1;
         }
     }
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        if (obstacles[i].x == nextX && obstacles[i].y == nextY) {
+            return 1;
+        }
+    }
     return 0;
 }
 
@@ -63,6 +136,11 @@ int checkCollision2(int nextX, int nextY) {
     }
     for (int i = 0; i < trailLength; i++) {
         if (trail[i].x == nextX && trail[i].y == nextY) {
+            return 1;
+        }
+    }
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        if (obstacles[i].x == nextX && obstacles[i].y == nextY) {
             return 1;
         }
     }
@@ -107,67 +185,83 @@ void printrastro2(int nextX, int nextY) {
     printf(".");
 }
 
-void drawBorders() {
-    for (int i = MINX; i <= MAXX; i++) {
-        screenGotoxy(i, MINY);
-        printf("#");
-        screenGotoxy(i, MAXY);
-        printf("#");
-    }
-    for (int i = MINY; i <= MAXY; i++) {
-        screenGotoxy(MINX, i);
-        printf("#");
-        screenGotoxy(MAXX, i);
-        printf("#");
-    }
-    screenUpdate();
+// Funções para Power-ups
+void printPowerUp(int x, int y) {
+    screenSetColor(MAGENTA, DARKGRAY);
+    screenGotoxy(x, y);
+    printf("*");
 }
 
-void displayInitialScreen() {
-    char player1[50], player2[50];
+void activatePowerUp1() {
+    powerUpActive1 = 1;
+    powerUpCounter1 = 0;
+}
+
+void activatePowerUp2() {
+    powerUpActive2 = 1;
+    powerUpCounter2 = 0;
+}
+
+void deactivatePowerUps() {
+    if (powerUpActive1 && powerUpCounter1 >= POWER_UP_DURATION) {
+        powerUpActive1 = 0;
+    }
+    if (powerUpActive2 && powerUpCounter2 >= POWER_UP_DURATION) {
+        powerUpActive2 = 0;
+    }
+}
+
+void displayInitialScreen(char *player1, char *player2) {
     screenInit(1);
     keyboardInit();
 
     // Exibir o anagrama do nome do jogo
-    printf("██████╗ ███████╗ █████╗ ████████╗██╗  ██╗    ██████╗  █████╗  ██████╗███████╗\n");
-    printf("██╔══██╗██╔════╝██╔══██╗╚══██╔══╝██║  ██║    ██╔══██╗██╔══██╗██╔════╝██╔════╝\n");
-    printf("██║  ██║█████╗  ███████║   ██║   ███████║    ██████╔╝███████║██║     █████╗  \n");
-    printf("██║  ██║██╔══╝  ██╔══██║   ██║   ██╔══██║    ██╔══██╗██╔══██║██║     ██╔══╝  \n");
-    printf("██████╔╝███████╗██║  ██║   ██║   ██║  ██║    ██║  ██║██║  ██║╚██████╗███████╗\n");
-    printf("╚═════╝ ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝\n");
+    printf("\n\n\n\n |           ██████╗ ███████╗ █████╗ ████████╗██╗  ██╗    ██████╗  █████╗  ██████╗███████╗\n");
+    printf(" |           ██╔══██╗██╔════╝██╔══██╗╚══██╔══╝██║  ██║    ██╔══██╗██╔══██╗██╔════╝██╔════╝\n");
+    printf(" |           ██║  ██║█████╗  ███████║   ██║   ███████║    ██████╔╝███████║██║     █████╗  \n");
+    printf(" |           ██║  ██║██╔══╝  ██╔══██║   ██║   ██╔══██║    ██╔══██╗██╔══██║██║     ██╔══╝  \n");
+    printf(" |           ██████╔╝███████╗██║  ██║   ██║   ██║  ██║    ██║  ██║██║  ██║╚██████╗███████╗\n");
+    printf(" |           ╚═════╝ ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝\n");
+
+    printf("\nJogador 1 = AZUL");
+    printf("\nJogador 2 = AMARELO");
 
     // Coletar os nomes dos jogadores
     printf("\nDigite o nome do Jogador 1: ");
     scanf("%s", player1);
-    printf("\nDigite o nome do Jogador 2: ");
+    printf("%s", player1);
+    printf("\n\nDigite o nome do Jogador 2: ");
     scanf("%s", player2);
-
-    // Salvar os nomes no arquivo winner.txt
-    FILE *file = fopen("winner.txt", "w");
-    if (file != NULL) {
-        fprintf(file, "%s\n", player1);
-        fprintf(file, "%s\n", player2);
-        fclose(file);
-    } else {
-        printf("Erro ao abrir o arquivo para salvar os nomes dos jogadores.\n");
-    }
-
-    drawBorders();
+    printf("%s", player2);
 
     screenDestroy();
     keyboardDestroy();
 }
 
 void initializeGame() {
-    x = 34; y = 12;
-    x2 = 54; y2 = 10;
+    x = 34;
+    y = 16;
+    x2 = 90;
+    y2 = 20;
     ver = hor = ver2 = hor2 = 0;
     trailLength = trail2Length = 0;
+    powerUpActive1 = powerUpActive2 = 0;
     screenInit(1);
     keyboardInit();
     timerInit(50);
     PrintPlayer1ver(x, y);
     PrintPlayer2ver(x2, y2);
+
+    // Gerar obstáculos aleatórios
+    srand(time(NULL));
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        obstacles[i].x = rand() % (MAXX - MINX + 1) + MINX;
+        obstacles[i].y = rand() % (MAXY - MINY + 1) + MINY;
+        screenSetColor(WHITE, DARKGRAY);
+        screenGotoxy(obstacles[i].x, obstacles[i].y);
+        printf("#");
+    }
+
     screenUpdate();
 }
 
@@ -239,7 +333,7 @@ int playGame() {
                 hor2 = 1;
             }
 
-            // Verificar colisão com os rastros de ambos os jogadores
+            // Verificar colisão com os rastros e obstáculos de ambos os jogadores
             if (checkCollision(newX, newY) || (newX == x2 && newY == y2)) {
                 gameOver = 1;
             } else if (checkCollision2(newX2, newY2) || (newX2 == x && newY2 == y)) {
@@ -266,6 +360,11 @@ int playGame() {
                 x2 = newX2;
                 y2 = newY2;
 
+                // Gerenciar a duração dos power-ups
+                if (powerUpActive1) powerUpCounter1++;
+                if (powerUpActive2) powerUpCounter2++;
+                deactivatePowerUps();
+
                 screenUpdate();
             }
         }
@@ -279,13 +378,17 @@ int playGame() {
 }
 
 void saveWinner(const char *winner) {
-    FILE *file = fopen("winner.txt", "a");
-    if (file != NULL) {
-        fprintf(file, "Vencedor: %s\n", winner);
-        fclose(file);
-    } else {
-        printf("Erro ao abrir o arquivo para salvar o vencedor.\n");
+    Node *temp = head;
+    while (temp != NULL) {
+        if (strcmp(temp->name, winner) == 0) {
+            temp->wins++;
+            saveListToFile(head, "winner.txt");
+            return;
+        }
+        temp = temp->next;
     }
+    appendNode(&head, winner, 1);
+    saveListToFile(head, "winner.txt");
 }
 
 int main() {
@@ -293,18 +396,7 @@ int main() {
     int winsPlayer1 = 0, winsPlayer2 = 0;
     int winner;
 
-    displayInitialScreen();
-
-    // Ler os nomes dos jogadores do arquivo winner.txt
-    FILE *file = fopen("winner.txt", "r");
-    if (file != NULL) {
-        fscanf(file, "%s", player1);
-        fscanf(file, "%s", player2);
-        fclose(file);
-    } else {
-        printf("Erro ao abrir o arquivo para ler os nomes dos jogadores.\n");
-        return 1;
-    }
+    displayInitialScreen(player1, player2);
 
     while (winsPlayer1 < 2 && winsPlayer2 < 2) {
         initializeGame();
@@ -327,5 +419,6 @@ int main() {
         saveWinner(player2);
     }
 
+    freeList(head);
     return 0;
 }
